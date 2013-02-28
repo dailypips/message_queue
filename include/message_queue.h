@@ -94,8 +94,10 @@ public:
             return;
         } else {
             pthread_mutex_lock(&receive_wait_mutex_);
-            receive_wait_ = false;
-            pthread_cond_broadcast(&receive_wait_cond_);
+            if (receive_wait) {
+                receive_wait_ = false;
+                pthread_cond_broadcast(&receive_wait_cond_);
+            }
             pthread_mutex_unlock(&receive_wait_mutex_);
         }
     }

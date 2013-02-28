@@ -26,8 +26,8 @@
 //
 #define MQ_CACHE_LINE_SIZE 64
 
-#define MQ_FLAG_RECV_BLOCK     (0)
-#define MQ_FLAG_RECV_NONBLOCK  (1 << 0)
+#define MQ_FLAG_RECV_BLOCK     (1 << 0)
+#define MQ_FLAG_RECV_NONBLOCK  (1 << 1)
 
 class ReceiveBlock {};
 class ReceiveNonblock {};

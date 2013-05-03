@@ -36,8 +36,8 @@ template<> struct CompileTimeAssertion<true> {};
 //
 #define MQ_CACHE_LINE_SIZE 64
 
-#define MQ_FLAG_RECV_BLOCK     (0)
-#define MQ_FLAG_RECV_NONBLOCK  (1 << 0)
+#define MQ_FLAG_RECV_BLOCK     (1 << 0)
+#define MQ_FLAG_RECV_NONBLOCK  (1 << 1)
 
 class ReceiveBlock {};
 class ReceiveNonblock {};
@@ -112,8 +112,10 @@ public:
             return;
         } else {
             pthread_mutex_lock(&receive_wait_mutex_);
-            receive_wait_ = false;
-            pthread_cond_broadcast(&receive_wait_cond_);
+            if (receive_wait) {
+                receive_wait_ = false;
+                pthread_cond_broadcast(&receive_wait_cond_);
+            }
             pthread_mutex_unlock(&receive_wait_mutex_);
         }
     }

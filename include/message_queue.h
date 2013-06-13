@@ -112,7 +112,7 @@ public:
             return;
         } else {
             pthread_mutex_lock(&receive_wait_mutex_);
-            if (receive_wait) {
+            if (receive_wait_) {
                 receive_wait_ = false;
                 pthread_cond_broadcast(&receive_wait_cond_);
             }

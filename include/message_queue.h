@@ -66,9 +66,9 @@ template <typename T, typename Traits = MessageQueueTraits<ReceiveBlock> >
 struct MessageQueue {
 public:
     MessageQueue() :
-        receive_mutex_(),
         receive_wait_cond_(),
         receive_wait_mutex_(),
+        n_msg_(),
         n_receiver_(0),
         first_(),
         receiveLock_(),
@@ -101,18 +101,23 @@ public:
 
     void Send(const T& t)
     {
-        Node* tmp = new Node(new T(t));
-        MQ_LOCK(sendLock_);
-        (last_.load())->next_ = tmp;
-        last_ = tmp;
-        MQ_UNLOCK(sendLock_);
-
         if (Traits::mode_::flag & MQ_FLAG_RECV_NONBLOCK) {
+            Node* tmp = new Node(new T(t));
+            MQ_LOCK(sendLock_);
+            (last_.load())->next_ = tmp;
+            last_ = tmp;
+            MQ_UNLOCK(sendLock_);
             return;
         } else {
-            std::lock_guard<std::mutex> lk(receive_wait_mutex_);
-            if (n_receiver_ > 0) {
-                receive_wait_cond_.notify_all();
+            Node* tmp = new Node(new T(t));
+            {
+                std::lock_guard<std::mutex> lk(receive_wait_mutex_);
+                (last_.load())->next_ = tmp;
+                last_ = tmp;
+                n_msg_++;
+                if (n_receiver_ > 0) {
+                    receive_wait_cond_.notify_all();
+                }
             }
         }
     }
@@ -137,33 +142,32 @@ public:
             MQ_UNLOCK(receiveLock_);
             return false;
         } else {
-            // use mutex
-            do {
-                {
-                    std::lock_guard<std::mutex> lk(receive_mutex_);
-                    Node* first = first_;
-                    Node* next = (first_.load())->next_;
+            {
+                std::unique_lock<std::mutex> lk(receive_wait_mutex_);
+                n_receiver_++;
+                while (n_msg_ == 0) {
+                    receive_wait_cond_.wait(lk);
+                }
+                n_receiver_--;
 
-                    if (next != nullptr) {
-                        T* val = next->value_;
-                        next->value_ = nullptr;
-                        first_ = next;
-                        data = *val;
-                        delete val;
-                        delete first;
-                        return true;
+                Node* first = first_;
+                Node* next = (first_.load())->next_;
+
+                if (next != nullptr) {
+                    T* val = next->value_;
+                    next->value_ = nullptr;
+                    first_ = next;
+                    data = *val;
+                    delete val;
+                    delete first;
+                    n_msg_--;
+                    if (n_msg_ > 0 && n_receiver_ > 0)
+                    {
+                        receive_wait_cond_.notify_all();
                     }
+                    return true;
                 }
-
-                // wait data
-                {
-                    std::unique_lock<std::mutex> lk(receive_wait_mutex_);
-                    n_receiver_++;
-                    receive_wait_cond_.wait(lk,
-                            [this]{return (n_receiver_ > 0);});
-                    n_receiver_--;
-                }
-            } while (1);
+            }
         }
     }
 
@@ -180,16 +184,16 @@ private:
                     sizeof(std::atomic<Node*>)];
     };
 
-    uint8_t pad0[MQ_CACHE_LINE_SIZE];
-
-    std::mutex receive_mutex_;
-    uint8_t pad1[MQ_CACHE_LINE_SIZE - sizeof(receive_mutex_)];
+    uint8_t pad1[MQ_CACHE_LINE_SIZE];
 
     std::condition_variable receive_wait_cond_;
     uint8_t pad2[MQ_CACHE_LINE_SIZE - sizeof(receive_wait_cond_)];
 
     std::mutex receive_wait_mutex_;
     uint8_t pad3[MQ_CACHE_LINE_SIZE - sizeof(receive_wait_mutex_)];
+
+    int n_msg_;
+    uint8_t pad4[MQ_CACHE_LINE_SIZE - sizeof(n_msg_)];
 
     int n_receiver_;
     uint8_t pad5[MQ_CACHE_LINE_SIZE - sizeof(n_receiver_)];

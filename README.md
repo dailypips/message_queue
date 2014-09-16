@@ -39,3 +39,9 @@ You can build test (sample) programs and find them in `build/bin`:
     cd build
     cmake ..
     make
+
+## Reference(s)
+
+* Writing a Generalized Concurrent Queue
+By Herb Sutter, October 29, 2008
+(http://www.drdobbs.com/parallel/writing-a-generalized-concurrent-queue/211601363#)

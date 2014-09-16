@@ -14,7 +14,7 @@ A message queue for inter thread communication:
 * clang version `>=` 3.3
 
 On Linux, if you want to use clang set the following environment variables
-before run `cmake` command:
+before you run `cmake` command:
 
     export CC=/usr/bin/clang
     export CXX=/usr/bin/clang++

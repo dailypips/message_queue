@@ -13,13 +13,11 @@
 #if (__clang_major__ < 3) || ((__clang_major__ == 3) && (__clang_minor__ < 3))
 #error "requires clang version >= 3.3"
 #endif
-#endif // #ifdef __clang__
-
-#ifdef __GNUC__
+#elif defined(__GNUC__)
 #if (__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 8)
 #error "requires gcc version >= 4.8"
 #endif
-#endif // #ifdef __GNUC__
+#endif // #ifdef __clang__
 
 #include <cstdint>
 #include <thread>
@@ -76,14 +74,13 @@ public:
         sendLock_()
     {
         static_assert(
-            ((sizeof(T*) + sizeof(bool) + sizeof(std::atomic<Node*>)) <
+            ((sizeof(T*) + sizeof(bool) + sizeof(std::atomic<Node*>)) <=
             MQ_CACHE_LINE_SIZE),
-            "the size of node data should be smaller than cache line size");
-        static_assert((sizeof(std::mutex) < MQ_CACHE_LINE_SIZE),
-            "the size of mutex should be smaller than cache line size");
-        static_assert((sizeof(std::condition_variable) < MQ_CACHE_LINE_SIZE),
-            "the size of condition variable should be smaller than cache line "
-            "size");
+            "the size of node data should be <= cache line size");
+        static_assert((sizeof(std::mutex) <= MQ_CACHE_LINE_SIZE),
+            "the size of mutex should be <= cache line size");
+        static_assert((sizeof(std::condition_variable) <= MQ_CACHE_LINE_SIZE),
+            "the size of condition variable should be <= cache line size");
 
         first_ = last_ = new Node(nullptr);
         sendLock_ = receiveLock_ = false;
@@ -167,6 +164,7 @@ public:
                     }
                     return true;
                 }
+                return false;
             }
         }
     }

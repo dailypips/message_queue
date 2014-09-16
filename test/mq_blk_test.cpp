@@ -1,12 +1,14 @@
 #include "message_queue.h"
-#include <cstdio>
 #include <cstdlib>
 #include <csignal>
+#include <iostream>
 #include <thread>
 #include <chrono>
 
 namespace {
     volatile sig_atomic_t sflag = 0;
+
+    std::mutex io_mut_;
 }
 
 void signal_handler(int signo)
@@ -26,8 +28,12 @@ static void consumer_routine(MessageQueue<Data>* dq)
     Data d;
 
     while (dq->Receive(d)) {
-        printf("id=%#lx received sequence=%d, value=%d\n",
-                std::this_thread::get_id(), d.sequence, d.value);
+        {
+            std::lock_guard<std::mutex> lk(io_mut_);
+            std::cout << "id=" << std::this_thread::get_id() <<
+                " received sequence=" << d.sequence <<
+                " value=" << d.value << "\n";
+        }
         if (d.value == 1)
         {
             break;
@@ -46,8 +52,12 @@ static void producer_routine(MessageQueue<Data>* dq)
         d.sequence = sequence++;
         d.value = sflag;
         dq->Send(d);
-        printf("id=%#lx send sequence=%d, value=%d\n",
-                std::this_thread::get_id(), d.sequence, d.value);
+        {
+            std::lock_guard<std::mutex> lk(io_mut_);
+            std::cout << "id=" << std::this_thread::get_id() <<
+                " send sequence=" << d.sequence <<
+                " value=" << d.value << "\n";
+        }
         if (sflag == 1)
         {
             break;

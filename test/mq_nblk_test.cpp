@@ -1,12 +1,14 @@
 #include "message_queue.h"
-#include <cstdio>
 #include <cstdlib>
 #include <csignal>
+#include <iostream>
 #include <thread>
 #include <chrono>
 
 namespace {
     volatile sig_atomic_t sflag = 0;
+
+    std::mutex io_mut_;
 }
 
 void signal_handler(int signo)
@@ -31,15 +33,22 @@ static void consumer_routine(Queue* dq)
     while (true) {
         ret = dq->Receive(d);
         if (ret) {
-            printf("id=%#lx received sequence=%d, value=%d\n",
-                    std::this_thread::get_id(), d.sequence, d.value);
+            {
+                std::lock_guard<std::mutex> lk(io_mut_);
+                std::cout << "id=" << std::this_thread::get_id() <<
+                    " received sequence=" << d.sequence <<
+                    " value=" << d.value << "\n";
+            }
             if (d.value == 1)
             {
                 break;
             }
         } else {
-            printf("id=%#lx Receive failure; sleep for 1 sec.\n",
-                    std::this_thread::get_id());
+            {
+                std::lock_guard<std::mutex> lk(io_mut_);
+                std::cout << "id=" << std::this_thread::get_id() <<
+                    " Receive failure; sleep for 1 sec.\n";
+            }
             std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     }
@@ -56,8 +65,12 @@ static void producer_routine(Queue* dq)
         d.sequence = sequence++;
         d.value = sflag;
         dq->Send(d);
-        printf("id=%#lx send sequence=%d, value=%d\n",
-                std::this_thread::get_id(), d.sequence, d.value);
+        {
+            std::lock_guard<std::mutex> lk(io_mut_);
+            std::cout << "id=" << std::this_thread::get_id() <<
+                " send sequence=" << d.sequence <<
+                " value=" << d.value << "\n";
+        }
         if (sflag == 1)
         {
             break;

@@ -14,8 +14,8 @@
 #error "requires clang version >= 3.3"
 #endif
 #elif defined(__GNUC__)
-#if (__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 8)
-#error "requires gcc version >= 4.8"
+#if (__GNUC__ < 4) || (__GNUC__ == 4 && __GNUC_MINOR__ < 7)
+#error "requires gcc version >= 4.7"
 #endif
 #endif // #ifdef __clang__
 

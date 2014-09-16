@@ -2,9 +2,11 @@
 
 A message queue for inter thread communication:
 
-* lock free (low lock) using CAS (compare and swap).
+* lock free (low lock) using `std::atomic` and `std::atomic_exchange_explicit`
+(your compiler should support c++11 features).
 * blocking or nonblocking receive mode.
-* copy everything and share nothing (allocate memory and a message is copied).
+* copy everything and share nothing
+(allocate memory and copy the message contents).
 
 ## Message Queue Traits
 

@@ -1,95 +1,91 @@
 #include "message_queue.h"
 #include <cstdio>
 #include <cstdlib>
-#include <unistd.h>
-#include <pthread.h>
+#include <csignal>
+#include <thread>
+#include <chrono>
+
+namespace {
+    volatile sig_atomic_t sflag = 0;
+}
+
+void signal_handler(int signo)
+{
+    sflag = 1;
+}
 
 struct Data {
     int sequence;
     int value;
 };
 
-typedef MessageQueue<Data, MessageQueueTraits<ReceiveNonblock> > DataQueue;
+typedef MessageQueue<Data, MessageQueueTraits<ReceiveNonblock> > Queue;
 
-static void *consumer_routine(void *arg)
+static void consumer_routine(Queue* dq)
 {
     using namespace std;
 
-    DataQueue *dq = static_cast<DataQueue*>(arg);
-    Data d;
     bool ret;
+    Data d;
 
     while (true) {
         ret = dq->Receive(d);
         if (ret) {
             printf("id=%#lx received sequence=%d, value=%d\n",
-                    pthread_self(), d.sequence, d.value);
+                    std::this_thread::get_id(), d.sequence, d.value);
+            if (d.value == 1)
+            {
+                break;
+            }
         } else {
             printf("id=%#lx Receive failure; sleep for 1 sec.\n",
-                    pthread_self());
-            sleep(1);
+                    std::this_thread::get_id());
+            std::this_thread::sleep_for(std::chrono::seconds(1));
         }
     }
-    return NULL;
 }
 
-static void *producer_routine(void *arg)
+static void producer_routine(Queue* dq)
 {
     using namespace std;
 
-    DataQueue *dq = static_cast<DataQueue*>(arg);
     int sequence = 0;
 
     while (true) {
         Data d;
         d.sequence = sequence++;
-        d.value = sequence;
+        d.value = sflag;
         dq->Send(d);
         printf("id=%#lx send sequence=%d, value=%d\n",
-                pthread_self(), d.sequence, d.value);
-        sleep(1);
+                std::this_thread::get_id(), d.sequence, d.value);
+        if (sflag == 1)
+        {
+            break;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
-    return NULL;
 }
 
 int main(int argc, char *argv[])
 {
     using namespace std;
 
-    int ret;
-    pthread_t consumer1;
-    pthread_t consumer2;
-    pthread_t producer1;
-    pthread_t producer2;
+    std::signal(SIGINT, signal_handler);
 
-    DataQueue dataQueue;
+    Queue dataQueue;
 
-    ret = pthread_create(&consumer1, NULL, consumer_routine, &dataQueue);
-    if (ret != 0) {
-        printf("pthread_create failure.\n");
-        exit(EXIT_FAILURE);
+    std::thread consumer1(consumer_routine, &dataQueue);
+    std::thread consumer2(consumer_routine, &dataQueue);
+    std::thread producer1(producer_routine, &dataQueue);
+    std::thread producer2(producer_routine, &dataQueue);
+
+    while (!sflag) {
+        std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
-    ret = pthread_create(&consumer2, NULL, consumer_routine, &dataQueue);
-    if (ret != 0) {
-        printf("pthread_create failure.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    ret = pthread_create(&producer1, NULL, producer_routine, &dataQueue);
-    if (ret != 0) {
-        printf("pthread_create failure.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    ret = pthread_create(&producer2, NULL, producer_routine, &dataQueue);
-    if (ret != 0) {
-        printf("pthread_create failure.\n");
-        exit(EXIT_FAILURE);
-    }
-
-    while (true) {
-        sleep(1);
-    }
+    consumer1.join();
+    consumer2.join();
+    producer1.join();
+    producer2.join();
     return 0;
 }

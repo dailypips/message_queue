@@ -121,7 +121,7 @@ public:
 
     bool Receive(T& data)
     {
-        // use low lock (spin w/ CAS).
+        // use low lock.
         if (Traits::mode_::flag & MQ_FLAG_RECV_NONBLOCK) {
             MQ_LOCK(receiveLock_);
             Node* first = first_;

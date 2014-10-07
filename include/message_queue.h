@@ -88,7 +88,7 @@ public:
 
     ~MessageQueue()
     {
-        while (first_ != nullptr) {
+        while (first_.load() != nullptr) {
             Node* tmp = first_.load();
             first_.store(tmp->next_);
             delete tmp->value_;
@@ -171,8 +171,8 @@ public:
 
 private:
     // non-copyable
-    MessageQueue(const MessageQueue &other);
-    const MessageQueue &operator=(const MessageQueue &other);
+    MessageQueue(const MessageQueue &other) = delete;
+    const MessageQueue &operator=(const MessageQueue &other) = delete;
 
     struct Node {
         Node(T* val) : value_(val), next_(nullptr) {}
